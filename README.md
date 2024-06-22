@@ -2,6 +2,8 @@
 
 This project involves extracting data from the Spotify API, processing it using AWS services (Lambda, S3, Glue), and loading it into Snowflake for further analysis.
 
+![Data Pipeline Flow](flow.jpeg)
+
 ## Overview
 
 1. **Data Extraction**: 
