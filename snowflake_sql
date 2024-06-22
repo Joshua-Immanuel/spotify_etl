@@ -1,0 +1,99 @@
+CREATE DATABASE spotify_db;
+
+create or  replace storage integration s3_init
+TYPE = EXTERNAL_STAGE
+STORAGE_PROVIDER= S3
+ENABLED= TRUE
+STORAGE_AWS_ROLE_ARN= 'arn:aws:iam::560632500467:role/spotify_snowflake_role'
+STORAGE_ALLOWED_LOCATIONS = ('s3://spotify-etl-pipeline-vemana')
+COMMENT ='CREATING CONNECTION TO S3'
+
+desc integration s3_init;
+
+
+create or replace file format csv_fileformat
+type= csv
+field_delimiter= ','
+skip_header= 1
+null_if =('NULL','null')
+empty_field_as_null=True;
+
+CREATE OR REPLACE STAGE spotify_stage
+url = 's3://spotify-etl-pipeline-vemana/transformed_data'
+STORAGE_INTEGRATION= s3_init
+file_format = csv_fileformat;
+
+
+list @spotify_stage/songs_data/songs_transformed_2024-06-21/run-1718959480688-part-r-00000;
+
+
+
+
+create or replace table tbl_album(
+    album_id string,
+    name string,
+    release_date date,
+    total_tarcks int,
+    url string
+);
+
+
+
+create or replace table tbl_artists(
+    album_id string,
+    name string,
+    url string
+);
+
+
+create or replace table tbl_songs(
+    song_id string,
+    song_name string,
+    duration_ms int,
+    url string,
+    popularity int,
+    song_added date,
+    album_id string,
+    artist_id string
+);
+
+copy into tbl_songs
+from @spotify_stage/songs_data/songs_transformed_2024-06-21/run-1718959480688-part-r-00000;
+
+copy into tbl_artists
+from @spotify_stage/artist_data/artist_transformed_2024-06-21/run-1718959480420-part-r-00000;
+
+
+select * from tbl_artists;
+
+
+
+create  or replace schema pipe;
+
+create or replace pipe spotify_db.pipe.tbl_songs_pipe
+auto_ingest =True
+as
+copy into spotify_db.public.tbl_songs
+from @spotify_db.public.spotify_stage/songs_data/songs_transformed_2024-06-21/;
+
+
+create or replace pipe pipe.tbl_artists_pipe
+auto_ingest =True
+as
+copy into spotify_db.public.tbl_artists
+from @spotify_db.public.spotify_stage/artist_data/artist_transformed_2024-06-21/;
+
+
+create or replace pipe pipe.tbl_album_pipe
+auto_ingest =True
+as
+copy into spotify_db.public.tbl_album
+from @spotify_db.public.spotify_stage/album_data/album_transformed_2024-06-21/;
+
+
+desc pipe pipe.tbl_songs_pipe;
+
+select * from tbl_songs;
+
+
+select system$pipe_status('pipe.tbl_songs_pipe');
